@@ -1,6 +1,7 @@
 package log
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,13 +15,17 @@ type Logger interface {
 	Infof(message string, args ...interface{}) LogRecord
 	Warnf(message string, args ...interface{}) LogRecord
 	Errorf(message string, args ...interface{}) LogRecord
-	Fatalf(message string, args ...interface{}) LogRecord
+	Fatalf(message string, args ...interface{})
 
 	DebugCtxf(identifier string, message string, args ...interface{}) LogRecord
 	InfoCtxf(identifier string, message string, args ...interface{}) LogRecord
 	WarnCtxf(identifier string, message string, args ...interface{}) LogRecord
 	ErrorCtxf(identifier string, message string, args ...interface{}) LogRecord
-	FatalCtxf(identifier string, message string, args ...interface{}) LogRecord
+	FatalCtxf(identifier string, message string, args ...interface{})
+
+	Println(args ...interface{}) LogRecord
+	Printf(message string, args ...interface{}) LogRecord
+	Fatal(args ...interface{})
 
 	Handlers() []Handler
 	SetHandlers(hs []Handler)
@@ -100,8 +105,9 @@ func (l *logger) Errorf(message string, args ...interface{}) LogRecord {
 	return l.Logf(LevelError, message, args...)
 }
 
-func (l *logger) Fatalf(message string, args ...interface{}) LogRecord {
-	return l.Logf(LevelFatal, message, args...)
+func (l *logger) Fatalf(message string, args ...interface{}) {
+	record := l.Logf(LevelFatal, message, args...)
+	panic(record.Format())
 }
 
 func (l *logger) DebugCtxf(identifier string, message string, args ...interface{}) LogRecord {
@@ -120,8 +126,24 @@ func (l *logger) ErrorCtxf(identifier string, message string, args ...interface{
 	return l.LogCtxf(identifier, LevelError, message, args...)
 }
 
-func (l *logger) FatalCtxf(identifier string, message string, args ...interface{}) LogRecord {
-	return l.LogCtxf(identifier, LevelFatal, message, args...)
+func (l *logger) FatalCtxf(identifier string, message string, args ...interface{}) {
+	record := l.LogCtxf(identifier, LevelFatal, message, args...)
+	panic(record.Format())
+}
+
+func (l *logger) Printf(message string, args ...interface{}) LogRecord {
+	return l.Logf(l.LogLevel(), message, args...)
+}
+
+func (l *logger) Println(args ...interface{}) LogRecord {
+	message := strings.Repeat("%v ", len(args))
+	message = message[0 : len(message)-1]
+	return l.Printf(message, args...)
+}
+func (l *logger) Fatal(args ...interface{}) {
+	message := strings.Repeat("%v ", len(args))
+	message = message[0 : len(message)-1]
+	l.Fatalf(message, args...)
 }
 
 func (l *logger) NewContextLogger() Logger {

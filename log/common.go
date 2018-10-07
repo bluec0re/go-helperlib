@@ -64,8 +64,20 @@ func Errorf(message string, args ...interface{}) LogRecord {
 	return defaultLogger.Errorf(message, args...)
 }
 
-func Fatalf(message string, args ...interface{}) LogRecord {
-	return defaultLogger.Fatalf(message, args...)
+func Fatalf(message string, args ...interface{}) {
+	defaultLogger.Fatalf(message, args...)
+}
+
+func Println(args ...interface{}) LogRecord {
+	return defaultLogger.Println(args...)
+}
+
+func Printf(message string, args ...interface{}) LogRecord {
+	return defaultLogger.Printf(message, args...)
+}
+
+func Fatal(args ...interface{}) {
+	defaultLogger.Fatal(args...)
 }
 
 func AddFileHandler(filename string) (Handler, error) {
