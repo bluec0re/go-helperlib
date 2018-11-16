@@ -1,5 +1,7 @@
 package log
 
+import "context"
+
 var (
 	defaultLogger = &logger{
 		handlers: []Handler{
@@ -93,4 +95,8 @@ func AddFileHandler(filename string) (Handler, error) {
 
 func NewContextLogger() Logger {
 	return defaultLogger.NewContextLogger()
+}
+
+func NewContextLoggerWithParent(ctx context.Context) Logger {
+	return defaultLogger.NewContextLoggerWithParent(ctx)
 }
