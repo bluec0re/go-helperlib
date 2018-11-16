@@ -1,14 +1,17 @@
 package log
 
 import (
+	"context"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
 
+const logCtxKey = "LOG_IDENTIFIER"
+
 type Logger interface {
-	LogCtxf(identifier string, level LogLevel, message string, args ...interface{}) LogRecord
+	LogCtxf(ctx context.Context, level LogLevel, message string, args ...interface{}) LogRecord
 	Logf(level LogLevel, message string, args ...interface{}) LogRecord
 
 	Debugf(message string, args ...interface{}) LogRecord
@@ -17,11 +20,11 @@ type Logger interface {
 	Errorf(message string, args ...interface{}) LogRecord
 	Fatalf(message string, args ...interface{})
 
-	DebugCtxf(identifier string, message string, args ...interface{}) LogRecord
-	InfoCtxf(identifier string, message string, args ...interface{}) LogRecord
-	WarnCtxf(identifier string, message string, args ...interface{}) LogRecord
-	ErrorCtxf(identifier string, message string, args ...interface{}) LogRecord
-	FatalCtxf(identifier string, message string, args ...interface{})
+	DebugCtxf(ctx context.Context, message string, args ...interface{}) LogRecord
+	InfoCtxf(ctx context.Context, message string, args ...interface{}) LogRecord
+	WarnCtxf(ctx context.Context, message string, args ...interface{}) LogRecord
+	ErrorCtxf(ctx context.Context, message string, args ...interface{}) LogRecord
+	FatalCtxf(ctx context.Context, message string, args ...interface{})
 
 	Println(args ...interface{}) LogRecord
 	Printf(message string, args ...interface{}) LogRecord
@@ -31,24 +34,24 @@ type Logger interface {
 	SetHandlers(hs []Handler)
 	SetLogLevel(l LogLevel)
 	LogLevel() LogLevel
-	Identifier() string
-	SetIdentifier(i string)
+	Context() context.Context
+	SetContext(ctx context.Context)
 
 	NewContextLogger() Logger
 }
 
 type logger struct {
-	handlers          []Handler
-	minLevel          LogLevel
-	defaultIdentifier string
+	handlers   []Handler
+	minLevel   LogLevel
+	defaultCtx context.Context
 }
 
-func (l *logger) Identifier() string {
-	return l.defaultIdentifier
+func (l *logger) Context() context.Context {
+	return l.defaultCtx
 }
 
-func (l *logger) SetIdentifier(i string) {
-	l.defaultIdentifier = i
+func (l *logger) SetContext(ctx context.Context) {
+	l.defaultCtx = ctx
 }
 
 func (l *logger) Handlers() []Handler {
@@ -60,20 +63,20 @@ func (l *logger) SetHandlers(hs []Handler) {
 }
 
 func (l *logger) Logf(level LogLevel, message string, args ...interface{}) LogRecord {
-	return l.LogCtxf(l.defaultIdentifier, level, message, args...)
+	return l.LogCtxf(l.defaultCtx, level, message, args...)
 }
 
-func (l *logger) LogCtxf(identifier string, level LogLevel, message string, args ...interface{}) LogRecord {
+func (l *logger) LogCtxf(ctx context.Context, level LogLevel, message string, args ...interface{}) LogRecord {
 	if level < l.minLevel {
 		return nil
 	}
 	lr := &logRecord{
-		time:      time.Now(),
-		level:     level,
-		message:   message,
-		args:      args,
-		caller:    getCaller(),
-		identifer: identifier,
+		time:    time.Now(),
+		level:   level,
+		message: message,
+		args:    args,
+		caller:  getCaller(),
+		ctx:     ctx,
 	}
 	for _, handler := range l.handlers {
 		handler.Handle(lr)
@@ -110,24 +113,24 @@ func (l *logger) Fatalf(message string, args ...interface{}) {
 	panic(record.Format())
 }
 
-func (l *logger) DebugCtxf(identifier string, message string, args ...interface{}) LogRecord {
-	return l.LogCtxf(identifier, LevelDebug, message, args...)
+func (l *logger) DebugCtxf(ctx context.Context, message string, args ...interface{}) LogRecord {
+	return l.LogCtxf(ctx, LevelDebug, message, args...)
 }
 
-func (l *logger) InfoCtxf(identifier string, message string, args ...interface{}) LogRecord {
-	return l.LogCtxf(identifier, LevelInfo, message, args...)
+func (l *logger) InfoCtxf(ctx context.Context, message string, args ...interface{}) LogRecord {
+	return l.LogCtxf(ctx, LevelInfo, message, args...)
 }
 
-func (l *logger) WarnCtxf(identifier string, message string, args ...interface{}) LogRecord {
-	return l.LogCtxf(identifier, LevelWarn, message, args...)
+func (l *logger) WarnCtxf(ctx context.Context, message string, args ...interface{}) LogRecord {
+	return l.LogCtxf(ctx, LevelWarn, message, args...)
 }
 
-func (l *logger) ErrorCtxf(identifier string, message string, args ...interface{}) LogRecord {
-	return l.LogCtxf(identifier, LevelError, message, args...)
+func (l *logger) ErrorCtxf(ctx context.Context, message string, args ...interface{}) LogRecord {
+	return l.LogCtxf(ctx, LevelError, message, args...)
 }
 
-func (l *logger) FatalCtxf(identifier string, message string, args ...interface{}) {
-	record := l.LogCtxf(identifier, LevelFatal, message, args...)
+func (l *logger) FatalCtxf(ctx context.Context, message string, args ...interface{}) {
+	record := l.LogCtxf(ctx, LevelFatal, message, args...)
 	panic(record.Format())
 }
 
@@ -146,16 +149,24 @@ func (l *logger) Fatal(args ...interface{}) {
 	l.Fatalf(message, args...)
 }
 
-func (l *logger) NewContextLogger() Logger {
+func (l *logger) NewContextLoggerWithParent(ctx context.Context) Logger {
 	log := &logger{
-		minLevel:          l.minLevel,
-		handlers:          l.handlers,
-		defaultIdentifier: NewIdentifier(),
+		minLevel:   l.minLevel,
+		handlers:   l.handlers,
+		defaultCtx: NewContextWithParent(ctx),
 	}
 	return log
 }
 
-func NewIdentifier() string {
-	u := uuid.Must(uuid.NewUUID())
-	return u.String()
+func (l *logger) NewContextLogger() Logger {
+	return l.NewContextLoggerWithParent(l.defaultCtx)
+}
+
+func NewContext() context.Context {
+	return NewContextWithParent(context.Background())
+}
+
+func NewContextWithParent(ctx context.Context) context.Context {
+	u, _ := uuid.NewUUID()
+	return context.WithValue(ctx, logCtxKey, u)
 }

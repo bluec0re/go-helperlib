@@ -1,10 +1,13 @@
 package log
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type LogRecord interface {
@@ -19,12 +22,12 @@ type LogRecord interface {
 }
 
 type logRecord struct {
-	time      time.Time
-	level     LogLevel
-	message   string
-	args      []interface{}
-	caller    string
-	identifer string
+	time    time.Time
+	level   LogLevel
+	message string
+	args    []interface{}
+	caller  string
+	ctx     context.Context
 }
 
 func (lr *logRecord) Format() string {
@@ -52,7 +55,15 @@ func (lr *logRecord) Caller() string {
 }
 
 func (lr *logRecord) Identifier() string {
-	return lr.identifer
+	val := lr.ctx.Value(logCtxKey)
+	if val == nil {
+		return ""
+	}
+	return val.(uuid.UUID).String()
+}
+
+func (lr *logRecord) Context() context.Context {
+	return lr.ctx
 }
 
 func (lr *logRecord) UpdateCaller() {
