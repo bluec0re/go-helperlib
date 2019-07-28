@@ -2,15 +2,24 @@ package log
 
 import (
 	"context"
+	"io"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-const logCtxKey = "LOG_IDENTIFIER"
+type contextKey string
+
+func (c contextKey) String() string {
+	return "LOG_" + string(c)
+}
+
+const logCtxKey = contextKey("IDENTIFIER")
+const logVarsCtxKey = contextKey("VARIABLES")
 
 type Logger interface {
+	io.Closer
 	LogCtxf(ctx context.Context, level LogLevel, message string, args ...interface{}) LogRecord
 	Logf(level LogLevel, message string, args ...interface{}) LogRecord
 
@@ -36,6 +45,7 @@ type Logger interface {
 	LogLevel() LogLevel
 	Context() context.Context
 	SetContext(ctx context.Context)
+	SetVariable(key string, value interface{})
 
 	NewContextLogger() Logger
 }
@@ -147,6 +157,24 @@ func (l *logger) Fatal(args ...interface{}) {
 	message := strings.Repeat("%v ", len(args))
 	message = message[0 : len(message)-1]
 	l.Fatalf(message, args...)
+}
+
+func (l *logger) SetVariable(key string, value interface{}) {
+	val := l.defaultCtx.Value(logVarsCtxKey)
+	if val == nil {
+		val = make(map[string]interface{})
+		l.defaultCtx = context.WithValue(l.defaultCtx, logVarsCtxKey, val)
+	}
+	val.(map[string]interface{})[key] = value
+}
+
+func (l *logger) Close() error {
+	for _, handler := range l.handlers {
+		if err := handler.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (l *logger) NewContextLoggerWithParent(ctx context.Context) Logger {

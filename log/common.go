@@ -7,6 +7,7 @@ var (
 		handlers: []Handler{
 			NewStderrHandler(),
 		},
+		defaultCtx: NewContext(),
 	}
 )
 
@@ -99,4 +100,8 @@ func NewContextLogger() Logger {
 
 func NewContextLoggerWithParent(ctx context.Context) Logger {
 	return defaultLogger.NewContextLoggerWithParent(ctx)
+}
+
+func CloseLogger() error {
+	return defaultLogger.Close()
 }

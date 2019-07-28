@@ -12,6 +12,7 @@ type Handler interface {
 	LogLevel() LogLevel
 	Formatter() LogFormatter
 	SetFormatter(lf LogFormatter)
+	io.Closer
 }
 
 type BaseHandler struct {
@@ -39,6 +40,7 @@ type StreamHandler struct {
 	BaseHandler
 	stream io.Writer
 	lock   sync.Mutex
+	closed bool
 }
 
 func (sh *StreamHandler) Handle(lr LogRecord) {
@@ -50,6 +52,23 @@ func (sh *StreamHandler) Handle(lr LogRecord) {
 
 	sh.fmt.Format(sh.stream, lr)
 	io.WriteString(sh.stream, "\n")
+}
+
+func (sh *StreamHandler) Close() error {
+	sh.lock.Lock()
+	defer sh.lock.Unlock()
+	if sh.closed {
+		return nil
+	}
+	if err := sh.fmt.Close(sh.stream); err != nil {
+		return err
+	}
+	sh.closed = true
+	c, ok := sh.stream.(io.Closer)
+	if ok {
+		return c.Close()
+	}
+	return nil
 }
 
 func NewStdoutHandler() *StreamHandler {

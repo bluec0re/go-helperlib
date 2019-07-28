@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"runtime"
 	"strings"
@@ -19,6 +20,8 @@ type LogRecord interface {
 	Caller() string
 	UpdateCaller()
 	Identifier() string
+	Vars() map[string]interface{}
+	json.Marshaler
 }
 
 type logRecord struct {
@@ -28,6 +31,30 @@ type logRecord struct {
 	args    []interface{}
 	caller  string
 	ctx     context.Context
+}
+
+func (lr logRecord) MarshalJSON() ([]byte, error) {
+	record := struct {
+		Time       time.Time
+		Level      LogLevel
+		LevelStr   string
+		Message    string
+		Arguments  []interface{}
+		Caller     string
+		Identifier string
+		Vars       map[string]interface{}
+	}{
+		lr.time,
+		lr.level,
+		lr.level.String(),
+		lr.message,
+		lr.args,
+		lr.caller,
+		lr.Identifier(),
+		lr.Vars(),
+	}
+
+	return json.Marshal(record)
 }
 
 func (lr *logRecord) Format() string {
@@ -60,6 +87,14 @@ func (lr *logRecord) Identifier() string {
 		return ""
 	}
 	return val.(uuid.UUID).String()
+}
+
+func (lr *logRecord) Vars() map[string]interface{} {
+	val := lr.ctx.Value(logVarsCtxKey)
+	if val == nil {
+		return make(map[string]interface{})
+	}
+	return val.(map[string]interface{})
 }
 
 func (lr *logRecord) Context() context.Context {
